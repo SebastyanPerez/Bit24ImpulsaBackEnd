@@ -2,12 +2,20 @@ import uuid
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, EmailStr
 
+class RolOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    descripcion: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 class UsuarioOut(BaseModel):
     id: uuid.UUID
     nombre: str
     apellido: str
     correo: str
     rol_id: Optional[uuid.UUID] = None
+    rol: Optional[RolOut] = None
 
     model_config = ConfigDict(from_attributes=True)
 
