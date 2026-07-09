@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.schemas.auth import UsuarioLogin, Token
 from app.schemas.usuario import UsuarioOut
@@ -12,20 +12,32 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/login", response_model=Token)
 def login(login_data: UsuarioLogin, db: Session = Depends(get_db)):
     """Authenticate user, verify password, and return a JWT access token."""
-    # Search user by email (correo)
-    user = db.query(Usuario).filter(Usuario.correo == login_data.correo).first()
-    
-    # Verify user exists and password is correct
+    user = (
+        db.query(Usuario)
+        .options(joinedload(Usuario.rol))
+        .filter(Usuario.correo == login_data.correo)
+        .first()
+    )
+
     if not user or not verify_password(login_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Correo o contraseña incorrectos",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # Generate JWT token using user UUID as string in subject (sub)
-    token = create_access_token(data={"sub": str(user.id)})
-    
+
+    if not user.estado:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario inactivo",
+        )
+
+    token_data = {"sub": str(user.id)}
+    if user.rol:
+        token_data["rol"] = user.rol.nombre
+
+    token = create_access_token(data=token_data)
+
     return {
         "access_token": token,
         "token_type": "bearer",
