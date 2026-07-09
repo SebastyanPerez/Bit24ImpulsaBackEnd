@@ -16,6 +16,7 @@ class UsuarioOut(BaseModel):
     correo: str
     rol_id: Optional[uuid.UUID] = None
     rol: Optional[RolOut] = None
+    estado: bool
 
     model_config = ConfigDict(from_attributes=True)
 
