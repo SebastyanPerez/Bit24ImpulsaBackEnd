@@ -1,7 +1,8 @@
 import uuid
-from typing import List, Optional
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.core.dependencies import require_admin
@@ -10,91 +11,100 @@ from app.models.usuarios import Usuario
 from app.models.roles import Rol
 from app.schemas.usuario import UsuarioOut, UsuarioCreate, UsuarioUpdate
 
-# Instantiate router and enforce require_admin dependency for all endpoints
 router = APIRouter(prefix="/usuarios", tags=["usuarios"], dependencies=[Depends(require_admin)])
+
+
+def _get_usuario(db: Session, usuario_id: uuid.UUID) -> Usuario | None:
+    return (
+        db.query(Usuario)
+        .options(joinedload(Usuario.rol))
+        .filter(Usuario.id == usuario_id)
+        .first()
+    )
+
+
+def _ensure_correo_disponible(db: Session, correo: str, usuario_id: uuid.UUID | None = None) -> None:
+    query = db.query(Usuario).filter(Usuario.correo == correo)
+    if usuario_id is not None:
+        query = query.filter(Usuario.id != usuario_id)
+    if query.first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El correo ya está registrado",
+        )
+
+
+def _ensure_rol_existe(db: Session, rol_id: uuid.UUID) -> None:
+    rol = db.query(Rol).filter(Rol.id == rol_id).first()
+    if not rol:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El rol especificado no existe",
+        )
+
 
 @router.get("", response_model=List[UsuarioOut])
 def list_usuarios(db: Session = Depends(get_db)):
     """List all users."""
-    return db.query(Usuario).all()
+    return db.query(Usuario).options(joinedload(Usuario.rol)).all()
+
 
 @router.get("/{usuario_id}", response_model=UsuarioOut)
 def get_usuario(usuario_id: uuid.UUID, db: Session = Depends(get_db)):
     """Get a user by ID."""
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    usuario = _get_usuario(db, usuario_id)
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado"
+            detail="Usuario no encontrado",
         )
     return usuario
+
 
 @router.post("", response_model=UsuarioOut, status_code=status.HTTP_201_CREATED)
 def create_usuario(usuario_data: UsuarioCreate, db: Session = Depends(get_db)):
     """Create a new user. The password is hashed before saving."""
-    # Check if email is already taken
-    existing_user = db.query(Usuario).filter(Usuario.correo == usuario_data.correo).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo ya está registrado"
-        )
-    
-    # Check if rol_id exists if provided
-    if usuario_data.rol_id:
-        rol = db.query(Rol).filter(Rol.id == usuario_data.rol_id).first()
-        if not rol:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El rol especificado no existe"
-            )
+    _ensure_correo_disponible(db, usuario_data.correo)
 
-    # Hash the password
-    hashed_pwd = hash_password(usuario_data.password)
-    
-    # Create the user
+    if usuario_data.rol_id:
+        _ensure_rol_existe(db, usuario_data.rol_id)
+
     new_user = Usuario(
         nombre=usuario_data.nombre,
         apellido=usuario_data.apellido,
         correo=usuario_data.correo,
-        password_hash=hashed_pwd,
+        password_hash=hash_password(usuario_data.password),
         rol_id=usuario_data.rol_id,
-        estado=True
+        estado=True,
     )
     db.add(new_user)
     db.commit()
-    db.refresh(new_user)
-    return new_user
+
+    usuario = _get_usuario(db, new_user.id)
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al recuperar el usuario creado",
+        )
+    return usuario
+
 
 @router.put("/{usuario_id}", response_model=UsuarioOut)
 def update_usuario(usuario_id: uuid.UUID, usuario_data: UsuarioUpdate, db: Session = Depends(get_db)):
-    """Update an existing user. Optional password will be hashed if provided."""
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    """Update an existing user without modifying the password."""
+    usuario = _get_usuario(db, usuario_id)
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado"
+            detail="Usuario no encontrado",
         )
-    
-    # Check if email is being updated to an already existing one
-    if usuario_data.correo and usuario_data.correo != usuario.correo:
-        existing_user = db.query(Usuario).filter(Usuario.correo == usuario_data.correo).first()
-        if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El correo ya está registrado"
-            )
-            
-    # Check if rol_id exists if provided
-    if usuario_data.rol_id:
-        rol = db.query(Rol).filter(Rol.id == usuario_data.rol_id).first()
-        if not rol:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El rol especificado no existe"
-            )
 
-    # Update fields if they are provided
+    if usuario_data.correo is not None and usuario_data.correo != usuario.correo:
+        _ensure_correo_disponible(db, usuario_data.correo, usuario_id)
+
+    if usuario_data.rol_id is not None:
+        _ensure_rol_existe(db, usuario_data.rol_id)
+
     if usuario_data.nombre is not None:
         usuario.nombre = usuario_data.nombre
     if usuario_data.apellido is not None:
@@ -103,26 +113,37 @@ def update_usuario(usuario_id: uuid.UUID, usuario_data: UsuarioUpdate, db: Sessi
         usuario.correo = usuario_data.correo
     if usuario_data.rol_id is not None:
         usuario.rol_id = usuario_data.rol_id
-        
-    # Hash and update password if provided
-    if usuario_data.password is not None:
-        usuario.password_hash = hash_password(usuario_data.password)
+    if usuario_data.estado is not None:
+        usuario.estado = usuario_data.estado
 
     db.commit()
-    db.refresh(usuario)
+
+    usuario = _get_usuario(db, usuario_id)
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado",
+        )
     return usuario
+
 
 @router.delete("/{usuario_id}", response_model=UsuarioOut)
 def delete_usuario(usuario_id: uuid.UUID, db: Session = Depends(get_db)):
     """Soft delete user by setting status (estado) to False."""
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    usuario = _get_usuario(db, usuario_id)
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado"
+            detail="Usuario no encontrado",
         )
-        
+
     usuario.estado = False
     db.commit()
-    db.refresh(usuario)
+
+    usuario = _get_usuario(db, usuario_id)
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado",
+        )
     return usuario
