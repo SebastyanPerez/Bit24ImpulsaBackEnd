@@ -115,6 +115,13 @@ def update_usuario(usuario_id: uuid.UUID, usuario_data: UsuarioUpdate, db: Sessi
         usuario.rol_id = usuario_data.rol_id
     if usuario_data.estado is not None:
         usuario.estado = usuario_data.estado
+    if usuario_data.password is not None and usuario_data.password.strip() != "":
+        if len(usuario_data.password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contraseña debe tener al menos 8 caracteres",
+            )
+        usuario.password_hash = hash_password(usuario_data.password)
 
     db.commit()
 

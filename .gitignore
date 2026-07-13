@@ -157,3 +157,14 @@ Desktop.ini
 # IDEs
 .vscode/
 .idea/
+
+# Scripts auxiliares locales de desarrollo y prueba
+fix_existing_guias.py
+list_all_users.py
+list_guias.py
+list_users.py
+reset_admin_password.py
+test_api_endpoints.py
+update_guia_direct.py
+verify_auth.py
+verify_learning.py

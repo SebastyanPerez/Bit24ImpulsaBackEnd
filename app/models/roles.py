@@ -11,3 +11,5 @@ class Rol(Base):
     descripcion = Column(Text, nullable=True)
 
     usuarios = relationship("Usuario", back_populates="rol")
+    rutas = relationship("Ruta", back_populates="rol")
+

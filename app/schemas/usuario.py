@@ -34,3 +34,5 @@ class UsuarioUpdate(BaseModel):
     correo: Optional[EmailStr] = None
     rol_id: Optional[uuid.UUID] = None
     estado: Optional[bool] = None
+    password: Optional[str] = None
+

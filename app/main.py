@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.database import get_db
-from app.routers import auth, dashboard, usuarios, roles
+from app.routers import auth, dashboard, usuarios, roles, rutas, tareas, guias
 
 app = FastAPI(
     title="Bit24 Impulsa API",
@@ -30,6 +30,9 @@ app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(usuarios.router)
 app.include_router(roles.router)
+app.include_router(rutas.router)
+app.include_router(tareas.router)
+app.include_router(guias.router)
 
 @app.get("/")
 def read_root():
