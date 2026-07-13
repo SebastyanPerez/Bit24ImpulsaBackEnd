@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, DateTime, UUID
+from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, DateTime, UUID, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -10,7 +10,7 @@ class Guia(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tarea_id = Column(UUID(as_uuid=True), ForeignKey("tareas.id"), nullable=False)
     titulo = Column(String(100), nullable=False)
-    contenido = Column(Text, nullable=True)
+    contenido = Column(JSON, nullable=True)
     video_url = Column(Text, nullable=True)
     duracion = Column(Integer, nullable=True)
     estado = Column(Boolean, default=True, nullable=False)
