@@ -1,13 +1,11 @@
 import uuid
+from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, EmailStr
 
-class RolOut(BaseModel):
-    id: uuid.UUID
-    nombre: str
-    descripcion: Optional[str] = None
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-    model_config = ConfigDict(from_attributes=True)
+from app.schemas.rol import RolOut
+
 
 class UsuarioOut(BaseModel):
     id: uuid.UUID
@@ -17,8 +15,10 @@ class UsuarioOut(BaseModel):
     rol_id: Optional[uuid.UUID] = None
     rol: Optional[RolOut] = None
     estado: bool
+    fecha_creacion: datetime = Field(validation_alias="created_at")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
 
 class UsuarioCreate(BaseModel):
     nombre: str
@@ -27,10 +27,12 @@ class UsuarioCreate(BaseModel):
     password: str
     rol_id: Optional[uuid.UUID] = None
 
+
 class UsuarioUpdate(BaseModel):
     nombre: Optional[str] = None
     apellido: Optional[str] = None
     correo: Optional[EmailStr] = None
-    password: Optional[str] = None
     rol_id: Optional[uuid.UUID] = None
+    estado: Optional[bool] = None
+    password: Optional[str] = None
 

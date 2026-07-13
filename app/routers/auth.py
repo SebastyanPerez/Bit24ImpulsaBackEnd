@@ -19,17 +19,22 @@ def login(login_data: UsuarioLogin, db: Session = Depends(get_db)):
         .first()
     )
 
-    if not user or not verify_password(login_data.password, user.password_hash):
+    is_valid = True
+    if not user:
+        is_valid = False
+        # Avoid user enumeration via timing attack
+        verify_password(login_data.password, "$2b$12$0123456789abcdefjhijk.lmnopqrstuvwxyzABCDEFGHIJKLM")
+    else:
+        if not verify_password(login_data.password, user.password_hash):
+            is_valid = False
+        if not user.estado:
+            is_valid = False
+
+    if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Correo o contraseña incorrectos",
+            detail="Credenciales incorrectas o usuario inactivo",
             headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    if not user.estado:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario inactivo",
         )
 
     token_data = {"sub": str(user.id)}
@@ -43,6 +48,7 @@ def login(login_data: UsuarioLogin, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "usuario": user
     }
+
 
 @router.get("/me", response_model=UsuarioOut)
 def get_me(current_user: Usuario = Depends(get_current_user)):

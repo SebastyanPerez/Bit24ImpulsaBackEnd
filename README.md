@@ -64,12 +64,18 @@ Bit24ImpulsaBackEnd/
 │   │   ├── __init__.py
 │   │   ├── auth.py            # Endpoints de Login y gestión de sesión (/auth)
 │   │   ├── dashboard.py       # Endpoint de estadísticas mock (/dashboard)
-│   │   └── usuarios.py        # Endpoints CRUD de usuarios (/usuarios)
+│   │   ├── usuarios.py        # Endpoints CRUD de usuarios (/usuarios)
+│   │   ├── rutas.py           # Endpoints CRUD de rutas de aprendizaje (/rutas)
+│   │   ├── tareas.py          # Endpoints CRUD de tareas (/tareas)
+│   │   └── guias.py           # Endpoints CRUD de guías rápidas (/guias)
 │   │
 │   ├── schemas/               # Validaciones de entrada/salida de datos (Pydantic)
 │   │   ├── __init__.py
 │   │   ├── auth.py            # Esquemas para login y respuesta de sesión
-│   │   └── usuario.py         # Esquemas CRUD de usuarios (Create, Update, Out)
+│   │   ├── usuario.py         # Esquemas CRUD de usuarios (Create, Update, Out)
+│   │   ├── ruta.py            # Esquemas de validaciones para rutas
+│   │   ├── tarea.py           # Esquemas de validaciones para tareas
+│   │   └── guia.py            # Esquemas de validaciones para guías rápidas
 │   │
 │   ├── config.py              # Variables de configuración y lectura de variables de entorno
 │   ├── database.py            # Configuración de SQLAlchemy Engine y SessionLocal
@@ -193,11 +199,11 @@ FastAPI genera automáticamente documentación interactiva detallada para probar
 
 ## 📊 Estado Actual del Sprint 1
 
-* **Duración**: 2 semanas (Sprint en curso - Día 3-4).
-* **Progreso General**: **~20%** de avance estimado.
+* **Duración**: 2 semanas (Sprint en curso)
+* **Progreso General**: **~65%** de avance estimado.
 
 ```text
-[████░░░░░░░░░░░░░░░░] 20% Completado
+[█████████████░░░░░░░] 65% Completado
 ```
 
 ### ✅ Funcionalidades Implementadas Hasta el Momento
@@ -217,6 +223,14 @@ FastAPI genera automáticamente documentación interactiva detallada para probar
    - Soft Delete en el endpoint `DELETE` cambiando la propiedad `estado = False` en lugar de borrar físicamente el registro.
 5. **Dashboard Base**:
    - Router `/dashboard` para servir métricas estadísticas iniciales mockeadas y lista de notificaciones.
+6. **Módulo de Aprendizaje (Learning)**:
+   - Modelos de base de datos relacionales con UUIDs para `Ruta`, `Tarea` y `Guia` con relaciones de herencia correspondientes.
+   - Router completo con endpoints CRUD `/rutas`, `/tareas`, y `/guias` optimizados para control y soft delete (`estado = False`).
+   - Endpoints jerárquicos: `GET /rutas/{ruta_id}/tareas` y `GET /tareas/{tarea_id}/guias` para el correcto renderizado dinámico en el Frontend.
+7. **Modificación Administrativa de Contraseña**:
+   - Añadido el campo opcional `password` en el esquema Pydantic `UsuarioUpdate`.
+   - Validación integrada en `PUT /usuarios/{usuario_id}` para obligar un mínimo de 8 caracteres con retorno exacto de un `400 Bad Request` en caso de fallar.
+   - Conversión de contraseñas con el hashing seguro del sistema (Bcrypt) durante el proceso de guardado, sin interferir con la sesión activa.
 
 ---
 
@@ -225,9 +239,7 @@ FastAPI genera automáticamente documentación interactiva detallada para probar
 1. **Conexión de Base de Datos Nube (Supabase)**:
    - Despliegue del esquema de tablas directamente a la instancia cloud de Supabase.
    - Inicialización o seeding de roles básicos (`Administrador`, `Usuario`, etc.) en la base de datos real.
-2. **Endpoints de Progreso y Aprendizaje**:
-   - Creación de routers para la asignación y visualización de rutas de aprendizaje, guías de estudio y tareas asignadas.
-3. **Endpoints de Soporte y Alertas**:
+2. **Endpoints de Soporte y Alertas**:
    - Controladores para levantar tickets de soporte técnico e interacción con alertas del sistema.
 4. **Integraciones Bit24 / Bitrix24**:
    - Configuración de la sincronización de actividades iniciales con la API de Bitrix24.
