@@ -75,3 +75,13 @@ def require_admin(current_user: Usuario = Depends(get_current_user)) -> Usuario:
         )
     return current_user
 
+def require_admin_or_responsable(current_user: Usuario = Depends(get_current_user)) -> Usuario:
+    """Dependency to check if the current user is an Administrator or Responsable Interno."""
+    if not current_user.rol or current_user.rol.nombre not in ["Administrador", "Responsable Interno"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permisos insuficientes",
+        )
+    return current_user
+
+
