@@ -5,6 +5,8 @@ from sqlalchemy import text
 from app.database import get_db
 from app.routers import auth, dashboard, usuarios, roles, rutas, tareas, guias
 
+from app.config import settings
+
 app = FastAPI(
     title="Bit24 Impulsa API",
     description="Backend API for the Bit24 Impulsa project.",
@@ -12,17 +14,14 @@ app = FastAPI(
 )
 
 # CORS configuration
-origins = [
-    "http://localhost:5173",
-    "https://bit24impulsabackend.onrender.com",
-]
+origins = [o.strip() for o in settings.allowed_origins.split(',')]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 # Include routers
