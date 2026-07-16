@@ -168,3 +168,4 @@ test_api_endpoints.py
 update_guia_direct.py
 verify_auth.py
 verify_learning.py
+verify_gemini.py

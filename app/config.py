@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     allowed_origins: str = 'http://localhost:5173'
+    gemini_api_key: str
 
     @property
     def SECRET_KEY(self) -> str:
