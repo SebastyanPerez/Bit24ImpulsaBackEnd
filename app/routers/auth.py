@@ -43,6 +43,9 @@ def login(login_data: UsuarioLogin, db: Session = Depends(get_db)):
 
     token = create_access_token(data=token_data)
 
+    from app.core.actividad_service import registrar_actividad
+    registrar_actividad(db, user.id, "Login", "Inició sesión")
+
     return {
         "access_token": token,
         "token_type": "bearer",

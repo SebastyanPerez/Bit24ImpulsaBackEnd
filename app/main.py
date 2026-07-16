@@ -2,11 +2,14 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from app.database import get_db
-from app.routers import auth, dashboard, usuarios, roles, rutas, tareas, guias, progreso, alertas, soporte, preguntas_ia
+from app.database import get_db, Base, engine
+from app.routers import auth, dashboard, usuarios, roles, rutas, tareas, guias, progreso, alertas, soporte, preguntas_ia, actividad
 
 
 from app.config import settings
+
+# Create tables if they do not exist
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Bit24 Impulsa API",
@@ -37,6 +40,7 @@ app.include_router(progreso.router)
 app.include_router(alertas.router)
 app.include_router(soporte.router)
 app.include_router(preguntas_ia.router)
+app.include_router(actividad.router)
 
 @app.get("/")
 def read_root():

@@ -76,6 +76,15 @@ def create_alerta(
     db.add(db_alerta)
     db.commit()
     db.refresh(db_alerta)
+
+    from app.core.actividad_service import registrar_actividad
+    registrar_actividad(
+        db,
+        current_user.id,
+        "Alertas",
+        f"Creó la alerta '{db_alerta.titulo}'",
+        referencia_id=db_alerta.id
+    )
     
     return (
         db.query(Alerta)

@@ -49,6 +49,15 @@ def create_soporte(
     db.add(db_soporte)
     db.commit()
     
+    from app.core.actividad_service import registrar_actividad
+    registrar_actividad(
+        db,
+        current_user.id,
+        "Soporte",
+        f"Creó el ticket '{db_soporte.titulo}'",
+        referencia_id=db_soporte.id
+    )
+    
     # Reload with relationships
     return (
         db.query(Soporte)
@@ -143,6 +152,15 @@ def update_soporte_estado(
     ticket.estado = soporte_in.estado
     db.commit()
     db.refresh(ticket)
+    
+    from app.core.actividad_service import registrar_actividad
+    registrar_actividad(
+        db,
+        current_user.id,
+        "Soporte",
+        f"Respondió/cerró el ticket '{ticket.titulo}'",
+        referencia_id=ticket.id
+    )
     
     return (
         db.query(Soporte)

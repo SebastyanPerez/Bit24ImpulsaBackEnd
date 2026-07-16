@@ -73,6 +73,18 @@ def update_progreso(
 
     db.commit()
     db.refresh(db_progreso)
+
+    # Log activity when task is marked as Completado
+    if new_estado == "Completado" and old_estado != "Completado":
+        from app.core.actividad_service import registrar_actividad
+        registrar_actividad(
+            db,
+            current_user.id,
+            "Progreso",
+            f"Completó la tarea '{tarea.titulo}'",
+            referencia_id=tarea_id
+        )
+
     return db_progreso
 
 @router.get("/resumen")

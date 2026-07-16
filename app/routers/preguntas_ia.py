@@ -36,6 +36,15 @@ def crear_pregunta_ia(
     db.add(db_pregunta)
     db.commit()
     db.refresh(db_pregunta)
+
+    from app.core.actividad_service import registrar_actividad
+    registrar_actividad(
+        db,
+        current_user.id,
+        "IA",
+        "Consultó al asistente IA",
+        detalle=pregunta_in.pregunta[:100]
+    )
     
     return db_pregunta
 
