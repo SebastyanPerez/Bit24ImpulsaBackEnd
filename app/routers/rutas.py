@@ -8,15 +8,19 @@ from app.core.dependencies import get_current_user, require_admin
 from app.models.rutas import Ruta
 from app.models.roles import Rol
 from app.models.tareas import Tarea
+from app.models.usuarios import Usuario
 from app.schemas.ruta import RutaCreate, RutaUpdate, RutaOut
 from app.schemas.tarea import TareaOut
 
 router = APIRouter(prefix="/rutas", tags=["rutas"])
 
-@router.get("", response_model=List[RutaOut], dependencies=[Depends(get_current_user)])
-def list_rutas(db: Session = Depends(get_db)):
+@router.get("", response_model=List[RutaOut])
+def list_rutas(db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """List all active routes in the system."""
-    return db.query(Ruta).filter(Ruta.estado == True).all()
+    query = db.query(Ruta).filter(Ruta.estado == True)
+    if not current_user.rol or current_user.rol.nombre not in ["Administrador", "Responsable Interno"]:
+        query = query.filter(Ruta.rol_id == current_user.rol_id)
+    return query.all()
 
 @router.get("/{id}", response_model=RutaOut, dependencies=[Depends(get_current_user)])
 def get_ruta(id: uuid.UUID, db: Session = Depends(get_db)):
@@ -29,8 +33,8 @@ def get_ruta(id: uuid.UUID, db: Session = Depends(get_db)):
         )
     return ruta
 
-@router.get("/{ruta_id}/tareas", response_model=List[TareaOut], dependencies=[Depends(get_current_user)])
-def list_tareas_por_ruta(ruta_id: uuid.UUID, db: Session = Depends(get_db)):
+@router.get("/{ruta_id}/tareas", response_model=List[TareaOut])
+def list_tareas_por_ruta(ruta_id: uuid.UUID, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """List all active tasks for a specific active route."""
     ruta = db.query(Ruta).filter(Ruta.id == ruta_id, Ruta.estado == True).first()
     if not ruta:
@@ -38,6 +42,12 @@ def list_tareas_por_ruta(ruta_id: uuid.UUID, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ruta no encontrada o inactiva"
         )
+    if current_user.rol and current_user.rol.nombre not in ["Administrador", "Responsable Interno"]:
+        if ruta.rol_id != current_user.rol_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No autorizado para acceder a esta ruta"
+            )
     return db.query(Tarea).filter(Tarea.ruta_id == ruta_id, Tarea.estado == True).order_by(Tarea.orden.asc()).all()
 
 @router.post("", response_model=RutaOut, status_code=status.HTTP_201_CREATED)

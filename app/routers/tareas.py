@@ -8,15 +8,19 @@ from app.core.dependencies import get_current_user, require_admin
 from app.models.rutas import Ruta
 from app.models.tareas import Tarea
 from app.models.guias import Guia
+from app.models.usuarios import Usuario
 from app.schemas.tarea import TareaCreate, TareaUpdate, TareaOut
 from app.schemas.guia import GuiaOut
 
 router = APIRouter(prefix="/tareas", tags=["tareas"])
 
-@router.get("", response_model=List[TareaOut], dependencies=[Depends(get_current_user)])
-def list_tareas(db: Session = Depends(get_db)):
+@router.get("", response_model=List[TareaOut])
+def list_tareas(db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """List all active tasks in the system."""
-    return db.query(Tarea).filter(Tarea.estado == True).all()
+    query = db.query(Tarea).filter(Tarea.estado == True)
+    if not current_user.rol or current_user.rol.nombre != "Administrador":
+        query = query.join(Ruta).filter(Ruta.rol_id == current_user.rol_id, Ruta.estado == True)
+    return query.all()
 
 @router.get("/{id}", response_model=TareaOut, dependencies=[Depends(get_current_user)])
 def get_tarea(id: uuid.UUID, db: Session = Depends(get_db)):

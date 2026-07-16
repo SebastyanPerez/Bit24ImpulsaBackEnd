@@ -7,14 +7,23 @@ from app.database import get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.models.tareas import Tarea
 from app.models.guias import Guia
+from app.models.usuarios import Usuario
+from app.models.rutas import Ruta
 from app.schemas.guia import GuiaCreate, GuiaUpdate, GuiaOut
 
 router = APIRouter(prefix="/guias", tags=["guias"])
 
-@router.get("", response_model=List[GuiaOut], dependencies=[Depends(get_current_user)])
-def list_guias(db: Session = Depends(get_db)):
+@router.get("", response_model=List[GuiaOut])
+def list_guias(db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     """List all active guides in the system."""
-    return db.query(Guia).filter(Guia.estado == True).all()
+    query = db.query(Guia).filter(Guia.estado == True)
+    if not current_user.rol or current_user.rol.nombre not in ["Administrador", "Responsable Interno"]:
+        query = query.join(Tarea).join(Ruta).filter(
+            Ruta.rol_id == current_user.rol_id,
+            Ruta.estado == True,
+            Tarea.estado == True
+        )
+    return query.all()
 
 @router.get("/{id}", response_model=GuiaOut, dependencies=[Depends(get_current_user)])
 def get_guia(id: uuid.UUID, db: Session = Depends(get_db)):
