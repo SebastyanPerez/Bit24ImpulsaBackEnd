@@ -40,14 +40,16 @@ El backend está estructurado siguiendo un diseño modular basado en FastAPI. Ut
 Bit24ImpulsaBackEnd/
 │
 ├── app/
-│   ├── core/                  # Seguridad, tokens y dependencias de protección de rutas
+│   ├── core/                  # Seguridad, dependencias de rutas y clientes externos
 │   │   ├── __init__.py
-│   │   ├── dependencies.py    # Dependencias comunes (get_db, require_admin, get_current_user)
-│   │   └── security.py        # Métodos para token JWT y hashing de contraseñas
+│   │   ├── dependencies.py    # Dependencias comunes (get_db, require_admin, require_admin_or_responsable)
+│   │   ├── security.py        # Métodos para token JWT y hashing de contraseñas
+│   │   ├── gemini_client.py   # Cliente SDK oficial para Google Gemini
+│   │   └── actividad_service.py # Servicio centralizado para registro de actividad
 │   │
 │   ├── models/                # Modelos ORM de SQLAlchemy (Base de datos relacional)
 │   │   ├── __init__.py
-│   │   ├── actividad.py
+│   │   ├── actividad.py       # Modelo 'actividad' (Auditoría de acciones)
 │   │   ├── alertas.py
 │   │   ├── categorias_soporte.py
 │   │   ├── guias.py
@@ -63,11 +65,15 @@ Bit24ImpulsaBackEnd/
 │   ├── routers/               # Controladores y endpoints de la API
 │   │   ├── __init__.py
 │   │   ├── auth.py            # Endpoints de Login y gestión de sesión (/auth)
-│   │   ├── dashboard.py       # Endpoint de estadísticas mock (/dashboard)
+│   │   ├── dashboard.py       # Endpoint de estadísticas (/dashboard)
 │   │   ├── usuarios.py        # Endpoints CRUD de usuarios (/usuarios)
 │   │   ├── rutas.py           # Endpoints CRUD de rutas de aprendizaje (/rutas)
 │   │   ├── tareas.py          # Endpoints CRUD de tareas (/tareas)
-│   │   └── guias.py           # Endpoints CRUD de guías rápidas (/guias)
+│   │   ├── guias.py           # Endpoints CRUD de guías rápidas (/guias)
+│   │   ├── alertas.py         # Endpoints para envío y atención de alertas (/alertas)
+│   │   ├── soporte.py         # Endpoints CRUD de tickets de soporte (/soporte)
+│   │   ├── preguntas_ia.py    # Endpoints para asistente IA de Gemini (/asistente-ia)
+│   │   └── actividad.py       # Endpoints para historia de actividad (/actividad)
 │   │
 │   ├── schemas/               # Validaciones de entrada/salida de datos (Pydantic)
 │   │   ├── __init__.py
@@ -75,7 +81,9 @@ Bit24ImpulsaBackEnd/
 │   │   ├── usuario.py         # Esquemas CRUD de usuarios (Create, Update, Out)
 │   │   ├── ruta.py            # Esquemas de validaciones para rutas
 │   │   ├── tarea.py           # Esquemas de validaciones para tareas
-│   │   └── guia.py            # Esquemas de validaciones para guías rápidas
+│   │   ├── guia.py            # Esquemas de validaciones para guías rápidas
+│   │   ├── preguntas_ia.py    # Esquemas para interacciones de IA (PreguntaCreate, PreguntaOut)
+│   │   └── actividad.py       # Esquemas para historial de actividad (ActividadOut)
 │   │
 │   ├── config.py              # Variables de configuración y lectura de variables de entorno
 │   ├── database.py            # Configuración de SQLAlchemy Engine y SessionLocal
@@ -116,9 +124,11 @@ python-dotenv
 pydantic
 pydantic-settings
 python-jose[cryptography]
+passlib[bcrypt]
 bcrypt
 python-multipart
 email-validator
+google-genai
 ```
 
 ---
@@ -172,6 +182,9 @@ DATABASE_URL=postgresql://postgres:[TU_CONTRASEÑA]@localhost:5432/bit24_impulsa
 JWT_SECRET=8f9b23b8f10647a7b8e1f0e4b859942d628d08c5c7db81ab9eb56019b8df7907
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Gemini API Integration
+GEMINI_API_KEY=tu_api_key_de_gemini_aqui
 ```
 
 ---
@@ -200,51 +213,44 @@ FastAPI genera automáticamente documentación interactiva detallada para probar
 ## 📊 Estado Actual del Sprint 1
 
 * **Duración**: 2 semanas (Sprint en curso)
-* **Progreso General**: **~65%** de avance estimado.
+* **Progreso General**: **100%** de avance completado.
 
 ```text
-[█████████████░░░░░░░] 65% Completado
+[████████████████████] 100% Completado
 ```
 
-### ✅ Funcionalidades Implementadas Hasta el Momento
+### ✅ Funcionalidades Implementadas
 
 1. **Diseño de Base de Datos y Modelos ORM**:
    - Creación de modelos de base de datos en SQLAlchemy para los recursos del proyecto: `Usuario`, `Rol`, `Ruta`, `Tarea`, `Progreso`, `Actividad`, `Guia`, `Soporte`, `CategoriasSoporte`, `Alerta`, `PreguntasIA` e `IntegracionBit24`.
-2. **Autenticación y Seguridad**:
+2. **Autenticación y Seguridad (JWT/Bcrypt)**:
    - Autenticación mediante JSON Web Tokens (JWT) firmados.
    - Hashing seguro de contraseñas utilizando la librería nativa `bcrypt` (evitando wrappers incompatibles de `passlib`).
    - Endpoints `/auth/login` para generación de tokens de acceso y `/auth/me` para obtener el perfil del usuario autenticado.
-3. **Middleware de Control de Acceso (Protección de Roles)**:
-   - Dependencia de validación de administrador (`require_admin`) que restringe el acceso solo a usuarios con rol exacto de `"Administrador"`.
+3. **Middleware de Control de Acceso y RBAC**:
+   - Dependencia de validación de administrador (`require_admin`) y responsable.
+   - Restricción y filtrado automático de rutas y guías de aprendizaje (`GET /rutas` y `GET /guias`) basado en el rol del usuario autenticado (Ventas, Caja, Almacén, Compras, Administración).
 4. **CRUD Completo de Usuarios**:
    - Agregados los esquemas Pydantic `UsuarioCreate` y `UsuarioUpdate`.
-   - Router `/usuarios` completo con los 5 endpoints CRUD tradicionales (`GET` lista, `GET` detalle, `POST` creación, `PUT` edición y `DELETE` soft delete), todos protegidos con verificación de administrador.
-   - Hashing automático de contraseñas en operaciones POST y PUT (si es suministrada).
-   - Soft Delete en el endpoint `DELETE` cambiando la propiedad `estado = False` en lugar de borrar físicamente el registro.
-5. **Dashboard Base**:
-   - Router `/dashboard` para servir métricas estadísticas iniciales mockeadas y lista de notificaciones.
-6. **Módulo de Aprendizaje (Learning)**:
-   - Modelos de base de datos relacionales con UUIDs para `Ruta`, `Tarea` y `Guia` con relaciones de herencia correspondientes.
-   - Router completo con endpoints CRUD `/rutas`, `/tareas`, y `/guias` optimizados para control y soft delete (`estado = False`).
-   - Endpoints jerárquicos: `GET /rutas/{ruta_id}/tareas` y `GET /tareas/{tarea_id}/guias` para el correcto renderizado dinámico en el Frontend.
-7. **Modificación Administrativa de Contraseña**:
-   - Añadido el campo opcional `password` en el esquema Pydantic `UsuarioUpdate`.
-   - Validación integrada en `PUT /usuarios/{usuario_id}` para obligar un mínimo de 8 caracteres con retorno exacto de un `400 Bad Request` en caso de fallar.
-   - Conversión de contraseñas con el hashing seguro del sistema (Bcrypt) durante el proceso de guardado, sin interferir con la sesión activa.
+   - Router `/usuarios` completo con soporte de Soft Delete (`estado = False`) e inyección automática de hashing de contraseñas.
+5. **Dashboard en Tiempo Real y Panel Responsable**:
+   - Endpoint `GET /dashboard`: Calcula dynamic metrics (alertas activas, casos de soporte abiertos/resueltos/pendientes, y la lista de tareas específicas según su ruta).
+   - Generación de recomendaciones personalizadas basadas en el avance del colaborador.
+   - Endpoint `GET /dashboard/responsable`: Consolida el porcentaje de adopción y áreas en riesgo alto a través de consultas analíticas directas agregadas.
+6. **Módulo de Aprendizaje e Integración de Guías**:
+   - Endpoints CRUD `/rutas`, `/tareas`, y `/guias` con relaciones jerárquicas `/rutas/{ruta_id}/tareas` y `/tareas/{tarea_id}/guias` completamente funcionales y persistidas en base de datos.
+7. **Soporte y Alertas**:
+   - Endpoints funcionales de soporte técnico e interacción con alertas del sistema.
+8. **Asistente IA (Gemini Integration)**:
+   - Integración nativa con el modelo **Gemini 1.5 Flash** a través del SDK oficial `google-genai`. Resuelve preguntas dinámicamente con categorización inteligente (Ventas, Caja, Almacén, etc.), guardando el historial de consultas del usuario en `GET /asistente-ia/historial`. Implementa un fallback de contingencia en español ante errores de conexión.
+9. **Línea de Actividad Reciente (Auditoría)**:
+   - Sistema de logging transaccional en la tabla `actividad`. Utiliza transacciones anidadas (`db.begin_nested()`) para evitar que errores en el logging afecten o provoquen un rollback en la operación de negocio principal (como login o finalización de tareas).
+   - Registra automáticamente 5 tipos de eventos críticos: login exitoso, completar tareas, envío de alertas, creación/cierre de tickets e interacciones con el Asistente IA. Permite la visualización de la línea de actividad reciente mediante `GET /actividad/reciente` (protegido por rol de administrador o responsable).
 
----
+### ⏳ Funcionalidades Pendientes
 
-### ⏳ Funcionalidades Pendientes (Restante del Sprint 1)
-
-1. **Conexión de Base de Datos Nube (Supabase)**:
-   - Despliegue del esquema de tablas directamente a la instancia cloud de Supabase.
-   - Inicialización o seeding de roles básicos (`Administrador`, `Usuario`, etc.) en la base de datos real.
-2. **Endpoints de Soporte y Alertas**:
-   - Controladores para levantar tickets de soporte técnico e interacción con alertas del sistema.
-4. **Integraciones Bit24 / Bitrix24**:
-   - Configuración de la sincronización de actividades iniciales con la API de Bitrix24.
-5. **Pruebas y QA**:
-   - Pruebas unitarias de routers clave (Autenticación y CRUD de usuarios).
+1. **Sincronización completa con API de Bitrix24 (CRM)**.
+2. **Ampliar el set de pruebas unitarias y de integración en CI/CD**.
 
 ---
 
