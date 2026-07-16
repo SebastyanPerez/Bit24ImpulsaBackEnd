@@ -3,7 +3,7 @@ from google import genai
 from google.genai import types
 from app.config import settings
 
-def preguntar_ia(pregunta: str) -> dict:
+async def preguntar_ia(pregunta: str) -> dict:
     """
     Sends a query to Google Gemini 2.5 Flash using the google-genai SDK.
     Parses the response to separate the answer and its categorized area.
@@ -27,7 +27,7 @@ def preguntar_ia(pregunta: str) -> dict:
         # Initialize the GenAI Client with settings api key
         client = genai.Client(api_key=settings.gemini_api_key)
         
-        response = client.models.generate_content(
+        response = await client.aio.models.generate_content(
             model="gemini-3.5-flash",
             contents=pregunta,
             config=types.GenerateContentConfig(

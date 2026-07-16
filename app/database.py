@@ -1,10 +1,14 @@
 from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
 
-# Create database engine
-engine = create_engine(settings.DATABASE_URL)
+# Create database engine (using NullPool if PgBouncer is active on port 6543)
+if ":6543" in settings.DATABASE_URL:
+    engine = create_engine(settings.DATABASE_URL, poolclass=NullPool)
+else:
+    engine = create_engine(settings.DATABASE_URL)
 
 # Session local class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

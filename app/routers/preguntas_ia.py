@@ -13,7 +13,7 @@ from app.schemas.preguntas_ia import PreguntaCreate, PreguntaOut
 router = APIRouter(prefix="/asistente-ia", tags=["asistente-ia"])
 
 @router.post("", response_model=PreguntaOut, status_code=status.HTTP_201_CREATED)
-def crear_pregunta_ia(
+async def crear_pregunta_ia(
     pregunta_in: PreguntaCreate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -22,7 +22,7 @@ def crear_pregunta_ia(
     Submit a question to the AI assistant.
     Calls Gemini API to retrieve answer & category, and logs it in the database.
     """
-    res_ai = preguntar_ia(pregunta_in.pregunta)
+    res_ai = await preguntar_ia(pregunta_in.pregunta)
     
     db_pregunta = PreguntaIA(
         usuario_id=current_user.id,
