@@ -5,13 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_admin_or_responsable
 from app.core.security import hash_password
 from app.models.usuarios import Usuario
 from app.models.roles import Rol
 from app.schemas.usuario import UsuarioOut, UsuarioCreate, UsuarioUpdate
 
-router = APIRouter(prefix="/usuarios", tags=["usuarios"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
 
 def _get_usuario(db: Session, usuario_id: uuid.UUID) -> Usuario | None:
@@ -44,13 +44,13 @@ def _ensure_rol_existe(db: Session, rol_id: uuid.UUID) -> None:
 
 
 @router.get("", response_model=List[UsuarioOut])
-def list_usuarios(db: Session = Depends(get_db)):
+def list_usuarios(db: Session = Depends(get_db), current_user: Usuario = Depends(require_admin_or_responsable)):
     """List all users."""
     return db.query(Usuario).options(joinedload(Usuario.rol)).all()
 
 
 @router.get("/{usuario_id}", response_model=UsuarioOut)
-def get_usuario(usuario_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_usuario(usuario_id: uuid.UUID, db: Session = Depends(get_db), current_user: Usuario = Depends(require_admin)):
     """Get a user by ID."""
     usuario = _get_usuario(db, usuario_id)
     if not usuario:
@@ -62,7 +62,7 @@ def get_usuario(usuario_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=UsuarioOut, status_code=status.HTTP_201_CREATED)
-def create_usuario(usuario_data: UsuarioCreate, db: Session = Depends(get_db)):
+def create_usuario(usuario_data: UsuarioCreate, db: Session = Depends(get_db), current_user: Usuario = Depends(require_admin)):
     """Create a new user. The password is hashed before saving."""
     _ensure_correo_disponible(db, usuario_data.correo)
 
@@ -90,7 +90,7 @@ def create_usuario(usuario_data: UsuarioCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{usuario_id}", response_model=UsuarioOut)
-def update_usuario(usuario_id: uuid.UUID, usuario_data: UsuarioUpdate, db: Session = Depends(get_db)):
+def update_usuario(usuario_id: uuid.UUID, usuario_data: UsuarioUpdate, db: Session = Depends(get_db), current_user: Usuario = Depends(require_admin)):
     """Update an existing user without modifying the password."""
     usuario = _get_usuario(db, usuario_id)
     if not usuario:
@@ -135,7 +135,7 @@ def update_usuario(usuario_id: uuid.UUID, usuario_data: UsuarioUpdate, db: Sessi
 
 
 @router.delete("/{usuario_id}", response_model=UsuarioOut)
-def delete_usuario(usuario_id: uuid.UUID, db: Session = Depends(get_db)):
+def delete_usuario(usuario_id: uuid.UUID, db: Session = Depends(get_db), current_user: Usuario = Depends(require_admin)):
     """Soft delete user by setting status (estado) to False."""
     usuario = _get_usuario(db, usuario_id)
     if not usuario:
